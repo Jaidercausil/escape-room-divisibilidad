@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Código Cauca · Sala de escape de divisibilidad</title>
+<style>
+  :root{
+    --bg:#0b0f0e;
+    --panel:#141b1a;
+    --panel-border:#26332e;
+    --amber:#e8b463;
+    --amber-dim:#a97e3f;
+    --river:#4fb6ad;
+    --alert:#c1443c;
+    --success:#74b56b;
+    --paper:#d8d0c2;
+    --paper-dim:#94897a;
+    --mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+    --serif: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif;
+  }
+
+  *{box-sizing:border-box;}
+
+  html,body{
+    margin:0;
+    padding:0;
+    background:var(--bg);
+    color:var(--paper);
+    font-family:var(--serif);
+    min-height:100%;
+  }
+
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    background:repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.018) 0px,
+      rgba(255,255,255,0.018) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    z-index:999;
+  }
+
+  #app{
+    max-width:760px;
+    margin:0 auto;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* ---------- HUD ---------- */
+  header#hud{
+    position:sticky;
+    top:0;
+    z-index:20;
+    background:rgba(11,15,14,0.96);
+    border-bottom:1px solid var(--panel-border);
+    padding:clamp(10px,2vw,16px) clamp(14px,3vw,22px);
+  }
+
+  .hud-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:10px;
+  }
+
+  .hud-title{
+    font-family:var(--mono);
+    letter-spacing:0.06em;
+    font-size:clamp(0.7rem,2vw,0.85rem);
+    color:var(--paper-dim);
+    text-transform:uppercase;
+  }
+
+  #timer{
+    font-family:var(--mono);
+    font-size:clamp(1.2rem,4vw,1.6rem);
+    color:var(--amber);
+    letter-spacing:0.05em;
+    font-variant-numeric:tabular-nums;
+  }
+
+  .river-bar{
+    display:flex;
+    align-items:center;
+    gap:4px;
+  }
+
+  .node{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    flex:0 0 auto;
+  }
+
+  .node .badge{
+    width:clamp(30px,7vw,40px);
+    height:clamp(30px,7vw,40px);
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--panel);
+    border:2px solid var(--alert);
+    font-size:clamp(0.9rem,3vw,1.1rem);
+    transition:border-color .4s ease, box-shadow .4s ease;
+  }
+
+  .node.open .badge{
+    border-color:var(--success);
+    box-shadow:0 0 10px rgba(116,181,107,0.55);
+  }
+
+  .node .label{
+    font-family:var(--mono);
+    font-size:clamp(0.55rem,1.6vw,0.68rem);
+    color:var(--paper-dim);
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+    white-space:nowrap;
+  }
+
+  .segment{
+    flex:1 1 auto;
+    height:3px;
+    min-width:8px;
+    background:var(--panel-border);
+    transition:background .5s ease;
+  }
+
+  .segment.flow{
+    background:linear-gradient(90deg, var(--river), var(--amber-dim), var(--river));
+    background-size:200% 100%;
+  }
+
+  @media (prefers-reduced-motion: no-preference){
+    .segment.flow{ animation:flow 2.6s linear infinite; }
+  }
+  @keyframes flow{ to{ background-position:-200% 0; } }
+
+  /* ---------- STAGE ---------- */
+  main#stage{
+    flex:1;
+    padding:clamp(18px,4vw,32px) clamp(16px,4vw,26px) 60px;
+  }
+
+  section{ display:block; }
+  section[hidden]{ display:none; }
+
+  .eyebrow{
+    font-family:var(--mono);
+    color:var(--river);
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    font-size:clamp(0.75rem,2vw,0.9rem);
+    margin:0 0 6px;
+  }
+
+  h1{
+    font-family:var(--serif);
+    font-size:clamp(1.6rem,5vw,2.4rem);
+    line-height:1.15;
+    margin:0 0 14px;
+    color:var(--amber);
+  }
+
+  h2{
+    font-family:var(--serif);
+    font-size:clamp(1.25rem,4vw,1.6rem);
+    margin:0 0 14px;
+    color:var(--paper);
+    font-style:italic;
+    font-weight:400;
+  }
+
+  p.narrative{
+    font-size:clamp(1rem,2.6vw,1.12rem);
+    line-height:1.65;
+    color:var(--paper);
+    margin:0 0 22px;
+  }
+
+  .intro-instructions{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-left:3px solid var(--river);
+    padding:14px 16px;
+    font-family:var(--mono);
+    font-size:clamp(0.82rem,2.2vw,0.92rem);
+    color:var(--paper-dim);
+    line-height:1.6;
+    margin-bottom:24px;
+  }
+
+  label.field-label{
+    display:block;
+    font-family:var(--mono);
+    font-size:0.8rem;
+    color:var(--paper-dim);
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    margin-bottom:6px;
+  }
+
+  input[type="text"].team-input{
+    width:100%;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    color:var(--amber);
+    font-family:var(--mono);
+    font-size:1rem;
+    padding:12px 14px;
+    border-radius:4px;
+    margin-bottom:22px;
+  }
+
+  button{
+    font-family:var(--mono);
+    font-size:clamp(0.9rem,2.4vw,1rem);
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    background:var(--amber);
+    color:#1a1408;
+    border:none;
+    padding:13px 22px;
+    border-radius:4px;
+    cursor:pointer;
+    transition:filter .15s ease, transform .1s ease;
+  }
+  button:hover{ filter:brightness(1.1); }
+  button:active{ transform:scale(0.98); }
+  button:focus-visible, input:focus-visible{
+    outline:2px solid var(--river);
+    outline-offset:2px;
+  }
+
+  .btn-start{ width:100%; padding:16px; font-size:clamp(1rem,2.8vw,1.15rem); }
+
+  /* terminal panel */
+  .terminal{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:6px;
+    padding:16px 18px;
+    margin-bottom:22px;
+    font-family:var(--mono);
+  }
+
+  .terminal-label{
+    color:var(--paper-dim);
+    font-size:0.78rem;
+    margin:0 0 10px;
+  }
+
+  .numbers{
+    color:var(--amber);
+    font-size:clamp(0.95rem,2.6vw,1.1rem);
+    letter-spacing:0.02em;
+    line-height:1.8;
+    margin:0 0 12px;
+    word-spacing:2px;
+  }
+
+  .group-label{
+    color:var(--river);
+    font-size:0.78rem;
+    text-transform:uppercase;
+    margin:14px 0 4px;
+  }
+
+  .prompt-line{
+    color:var(--paper);
+    font-size:clamp(0.88rem,2.4vw,1rem);
+    line-height:1.55;
+    margin:14px 0 0;
+    border-top:1px dashed var(--panel-border);
+    padding-top:12px;
+  }
+  .prompt-line::before{ content:"> "; color:var(--river); }
+
+  .answer-form{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:10px;
+  }
+
+  .answer-form input{
+    flex:1 1 160px;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    color:var(--amber);
+    font-family:var(--mono);
+    font-size:1.1rem;
+    padding:13px 14px;
+    border-radius:4px;
+  }
+
+  .feedback{
+    min-height:1.4em;
+    font-family:var(--mono);
+    font-size:0.9rem;
+    margin:6px 0 4px;
+  }
+  .feedback.ok{ color:var(--success); }
+  .feedback.bad{ color:var(--alert); }
+
+  .attempts-note{
+    font-family:var(--mono);
+    font-size:0.78rem;
+    color:var(--paper-dim);
+    margin:0 0 16px;
+  }
+
+  .hints{ display:flex; flex-direction:column; gap:8px; }
+
+  .hint{
+    display:none;
+    background:transparent;
+    border:1px dashed var(--amber-dim);
+    color:var(--paper);
+    font-family:var(--mono);
+    font-size:0.85rem;
+    line-height:1.5;
+    padding:10px 12px;
+    border-radius:4px;
+  }
+  .hint.shown{ display:block; }
+
+  .shake{ animation:shake .35s ease; }
+  @media (prefers-reduced-motion: no-preference){
+    @keyframes shake{
+      10%,90%{ transform:translateX(-2px); }
+      20%,80%{ transform:translateX(4px); }
+      30%,50%,70%{ transform:translateX(-6px); }
+      40%,60%{ transform:translateX(6px); }
+    }
+  }
+
+  /* final screen */
+  #final .final-title{
+    font-family:var(--mono);
+    font-size:clamp(2rem,8vw,3rem);
+    color:var(--success);
+    letter-spacing:0.04em;
+    margin:0 0 6px;
+    text-align:center;
+  }
+  #final .final-sub{
+    text-align:center;
+    color:var(--paper-dim);
+    font-family:var(--mono);
+    margin:0 0 26px;
+  }
+  #final .time-card{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:8px;
+    padding:22px;
+    text-align:center;
+    margin-bottom:22px;
+  }
+  #final .time-card .value{
+    font-family:var(--mono);
+    font-size:clamp(2rem,8vw,2.8rem);
+    color:var(--amber);
+  }
+  #final .time-card .label{
+    font-family:var(--mono);
+    font-size:0.78rem;
+    color:var(--paper-dim);
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+  }
+
+  .visually-hidden{
+    position:absolute;
+    width:1px;height:1px;
+    padding:0;margin:-1px;
+    overflow:hidden;
+    clip:rect(0,0,0,0);
+    white-space:nowrap;
+    border:0;
+  }
+
+  footer.credits{
+    text-align:center;
+    font-family:var(--mono);
+    font-size:0.72rem;
+    color:var(--paper-dim);
+    opacity:0.6;
+    padding:18px 16px 30px;
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <header id="hud">
+    <div class="hud-top">
+      <span class="hud-title">Código Cauca · Terminal intervenida</span>
+      <div id="timer">00:00</div>
+    </div>
+    <div class="river-bar" id="riverBar">
+      <div class="node" data-node="1"><div class="badge"><span class="lock">🔒</span></div><span class="label">Caucasia</span></div>
+      <div class="segment" data-seg="1"></div>
+      <div class="node" data-node="2"><div class="badge"><span class="lock">🔒</span></div><span class="label">El Bagre</span></div>
+      <div class="segment" data-seg="2"></div>
+      <div class="node" data-node="3"><div class="badge"><span class="lock">🔒</span></div><span class="label">Zaragoza</span></div>
+      <div class="segment" data-seg="3"></div>
+      <div class="node" data-node="4"><div class="badge"><span class="lock">🔒</span></div><span class="label">Nechí</span></div>
+    </div>
+  </header>
+
+  <main id="stage">
+
+    <!-- ================= INTRO ================= -->
+    <section id="intro">
+      <p class="eyebrow">Expediente confidencial · Bajo Cauca</p>
+      <h1>Código Cauca: Operación Río Limpio</h1>
+      <p class="narrative">
+        Son las 11:40 de la noche. Un grupo de jóvenes hacktivistas del Bajo Cauca —los <em>Centinelas del Cauca</em>—
+        logró copiar el computador portátil de una operación de minería ilegal que viene vertiendo mercurio
+        al río a la altura de Caucasia. El disco contiene los mapas, los sobornos y los nombres que las
+        autoridades ambientales llevan meses buscando.
+      </p>
+      <p class="narrative">
+        Pero el portátil está protegido por cuatro firewalls encadenados, uno por cada punto de la ruta del
+        río: Caucasia, El Bagre, Zaragoza y, por último, el servidor central cerca de Nechí. Cada firewall
+        se abre con un código numérico que solo se puede calcular aplicando los criterios de divisibilidad.
+        Un error no los bloquea: solo los hace perder tiempo. Y el tiempo, esta noche, también es evidencia.
+      </p>
+      <div class="intro-instructions">
+        Instrucciones: trabajen en equipo y tengan a mano los criterios de divisibilidad. Los intentos son
+        ilimitados — cada 2 intentos fallidos en un candado se desbloquea una pista nueva. El cronómetro
+        corre desde que pulsan «Iniciar operación» hasta que se abre el último firewall.
+      </div>
+      <label class="field-label" for="teamName">Nombre del equipo (opcional)</label>
+      <input type="text" id="teamName" class="team-input" placeholder="Ej: Los Centinelas 6°A" maxlength="40">
+      <button id="startBtn" class="btn-start" type="button">Iniciar operación</button>
+    </section>
+
+    <!-- ================= CANDADO 1 ================= -->
+    <section class="challenge" id="challenge-1" data-code="28620" hidden>
+      <p class="eyebrow">Candado 1 de 4 · Muelle de Caucasia</p>
+      <h2>El cargamento nocturno</h2>
+      <p class="narrative">
+        Interceptan la señal de las cámaras del muelle. Cada camión que cruza el río lleva un número de
+        guía disfrazado de código de carga. El sistema de la mina deja pasar sin alarma únicamente a los
+        camiones cuyo número cumple, al mismo tiempo, los tres criterios de divisibilidad por 2, por 5 y
+        por 10.
+      </p>
+      <div class="terminal">
+        <p class="terminal-label">// números de guía interceptados</p>
+        <p class="numbers">4520 · 3187 · 6210 · 8890 · 5005 · 7331 · 9000 · 2244</p>
+        <p class="prompt-line">Suma los números que cumplen los tres criterios (2, 5 y 10) a la vez. Ese total es la clave.</p>
+      </div>
+      <form class="answer-form" data-target="1">
+        <label class="visually-hidden" for="input-1">Código candado 1</label>
+        <input id="input-1" type="text" inputmode="numeric" autocomplete="off" placeholder="Código de acceso">
+        <button type="submit">Ejecutar</button>
+      </form>
+      <p class="feedback" id="feedback-1" aria-live="polite"></p>
+      <p class="attempts-note" id="attempts-1"></p>
+      <div class="hints">
+        <p class="hint hint-1">💡 Pista 1: si un número es divisible por 2, por 5 y por 10 al mismo tiempo, solo puede terminar en una cifra. ¿Cuál?</p>
+        <p class="hint hint-2">💡 Pista 2: los números que cumplen son 4520, 6210, 8890 y 9000. Súmalos.</p>
+      </div>
+    </section>
+
+    <!-- ================= CANDADO 2 ================= -->
+    <section class="challenge" id="challenge-2" data-code="4523" hidden>
+      <p class="eyebrow">Candado 2 de 4 · Zona minera de El Bagre</p>
+      <h2>Las coordenadas del dron</h2>
+      <p class="narrative">
+        Un dron de vigilancia capta las coordenadas cifradas de las dragas que remueven el lecho del río
+        cerca de El Bagre. El sistema oculta la ubicación real detrás de dos números: uno divisible por 4
+        pero NO por 25, y otro divisible por 25 pero NO por 4. Los números que terminan en 00 cumplen
+        ambos criterios a la vez: son señuelos, descártenlos.
+      </p>
+      <div class="terminal">
+        <p class="terminal-label">// coordenadas cifradas</p>
+        <p class="numbers">1348 · 3175 · 4400 · 2565 · 5231 · 7900</p>
+        <p class="prompt-line">Suma el número divisible SOLO por 4 con el número divisible SOLO por 25.</p>
+      </div>
+      <form class="answer-form" data-target="2">
+        <label class="visually-hidden" for="input-2">Código candado 2</label>
+        <input id="input-2" type="text" inputmode="numeric" autocomplete="off" placeholder="Código de acceso">
+        <button type="submit">Ejecutar</button>
+      </form>
+      <p class="feedback" id="feedback-2" aria-live="polite"></p>
+      <p class="attempts-note" id="attempts-2"></p>
+      <div class="hints">
+        <p class="hint hint-1">💡 Pista 1: para el 4 y el 25 solo importan las DOS ÚLTIMAS cifras del número, no el número completo.</p>
+        <p class="hint hint-2">💡 Pista 2: descarten 4400 y 7900 (cumplen ambos criterios). Entre los que quedan, busquen cuál termina en múltiplo de 4 y cuál termina en 25, 50, 75 o 00.</p>
+      </div>
+    </section>
+
+    <!-- ================= CANDADO 3 ================= -->
+    <section class="challenge" id="challenge-3" data-code="16029" hidden>
+      <p class="eyebrow">Candado 3 de 4 · Oficinas de Zaragoza</p>
+      <h2>El archivo de contraseñas</h2>
+      <p class="narrative">
+        En un correo interceptado en una oficina de Zaragoza aparece un archivo de contraseñas numéricas
+        usadas para autorizar los permisos falsos de las dragas. El sistema exige la suma de todas las
+        contraseñas que sean múltiplos de 9. Cuidado: algunas cumplen el criterio del 3 pero no el del 9.
+      </p>
+      <div class="terminal">
+        <p class="terminal-label">// contraseñas interceptadas</p>
+        <p class="numbers">4536 · 2711 · 3312 · 5001 · 8181 · 6004</p>
+        <p class="prompt-line">Suma únicamente los números que son divisibles por 9.</p>
+      </div>
+      <form class="answer-form" data-target="3">
+        <label class="visually-hidden" for="input-3">Código candado 3</label>
+        <input id="input-3" type="text" inputmode="numeric" autocomplete="off" placeholder="Código de acceso">
+        <button type="submit">Ejecutar</button>
+      </form>
+      <p class="feedback" id="feedback-3" aria-live="polite"></p>
+      <p class="attempts-note" id="attempts-3"></p>
+      <div class="hints">
+        <p class="hint hint-1">💡 Pista 1: suma las cifras de cada número. Si esa suma es múltiplo de 9 (9, 18, 27…), el número completo es divisible por 9.</p>
+        <p class="hint hint-2">💡 Pista 2: cuidado con 5001 — su suma de cifras da 6, así que es divisible por 3 pero NO por 9. Los correctos son 4536, 3312 y 8181.</p>
+      </div>
+    </section>
+
+    <!-- ================= CANDADO 4 ================= -->
+    <section class="challenge" id="challenge-4" data-code="10047" hidden>
+      <p class="eyebrow">Candado 4 de 4 · Servidor central, Nechí</p>
+      <h2>La última barrera</h2>
+      <p class="narrative">
+        Llegan al servidor central, escondido en un contenedor cerca de Nechí, donde el Cauca se junta con
+        otros afluentes antes de seguir su curso. Este firewall combina dos criterios a la vez: por 7 y
+        por 11. En el primer grupo hay un único número divisible por 7; en el segundo, un único número
+        divisible por 11.
+      </p>
+      <div class="terminal">
+        <p class="terminal-label">// firewall final</p>
+        <p class="group-label">Grupo A</p>
+        <p class="numbers">2534 · 3821 · 4173</p>
+        <p class="group-label">Grupo B</p>
+        <p class="numbers">7513 · 8524 · 6128</p>
+        <p class="prompt-line">Suma el número divisible por 7 (grupo A) con el número divisible por 11 (grupo B). Esa es la clave maestra.</p>
+      </div>
+      <form class="answer-form" data-target="4">
+        <label class="visually-hidden" for="input-4">Código candado 4</label>
+        <input id="input-4" type="text" inputmode="numeric" autocomplete="off" placeholder="Código de acceso">
+        <button type="submit">Ejecutar</button>
+      </form>
+      <p class="feedback" id="feedback-4" aria-live="polite"></p>
+      <p class="attempts-note" id="attempts-4"></p>
+      <div class="hints">
+        <p class="hint hint-1">💡 Pista 1 (por 7): separen la última cifra, multiplíquenla por 2 y réstensela al número que queda. Si el resultado es múltiplo de 7 (o 0), el número original también lo es.</p>
+        <p class="hint hint-2">💡 Pista 2 (por 11): sumen aparte las cifras en posiciones pares y en posiciones impares. Si la diferencia entre ambas sumas es 0 o múltiplo de 11, ese es el número. La clave final es 2534 + 7513.</p>
+      </div>
+    </section>
+
+    <!-- ================= FINAL ================= -->
+    <section id="final" hidden>
+      <p class="final-title">¡ESCAPARON!</p>
+      <p class="final-sub" id="finalTeam">Los Centinelas del Cauca</p>
+      <p class="narrative">
+        El último firewall cae. El portátil queda abierto: mapas de la zona de extracción, transferencias,
+        nombres. El archivo sale esa misma madrugada hacia la Corporación Autónoma Regional. El río no se
+        limpia en una noche, pero esta noche, al menos, alguien no pudo esconder lo que estaba haciendo.
+      </p>
+      <div class="time-card">
+        <div class="label">Tiempo total de la operación</div>
+        <div class="value" id="finalTime">00:00</div>
+      </div>
+      <button id="restartBtn" type="button">Reiniciar operación</button>
+    </section>
+
+  </main>
+
+  <footer class="credits">Sala de escape educativa · Criterios de divisibilidad · Bajo Cauca</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var state = {
+    current: 1,
+    total: 4,
+    startTime: null,
+    timerInterval: null,
+    attempts: {1:0, 2:0, 3:0, 4:0},
+    audioCtx: null
+  };
+
+  var introSection = document.getElementById('intro');
+  var finalSection = document.getElementById('final');
+  var timerEl = document.getElementById('timer');
+  var startBtn = document.getElementById('startBtn');
+  var restartBtn = document.getElementById('restartBtn');
+  var teamNameInput = document.getElementById('teamName');
+
+  function normalize(str){
+    return String(str || '').trim().replace(/[^0-9]/g, '');
+  }
+
+  function beep(freq, duration){
+    try{
+      if(!state.audioCtx){
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        state.audioCtx = new Ctx();
+      }
+      var ctx = state.audioCtx;
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.16, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration/1000);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + duration/1000);
+    }catch(e){ /* audio no disponible, seguimos sin sonido */ }
+  }
+
+  function formatTime(ms){
+    var totalSec = Math.floor(ms/1000);
+    var m = Math.floor(totalSec/60);
+    var s = totalSec % 60;
+    return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+  }
+
+  function tickTimer(){
+    var elapsed = Date.now() - state.startTime;
+    timerEl.textContent = formatTime(elapsed);
+  }
+
+  function startGame(){
+    var teamName = teamNameInput.value.trim();
+    introSection.hidden = true;
+    document.getElementById('challenge-1').hidden = false;
+    state.startTime = Date.now();
+    state.timerInterval = setInterval(tickTimer, 250);
+    tickTimer();
+    if(teamName){
+      document.getElementById('finalTeam').textContent = teamName;
+    }
+    document.getElementById('input-1').focus();
+  }
+
+  function openNode(n){
+    var node = document.querySelector('.node[data-node="'+n+'"]');
+    if(node){
+      node.classList.add('open');
+      node.querySelector('.lock').textContent = '🔓';
+    }
+    var seg = document.querySelector('.segment[data-seg="'+n+'"]');
+    if(seg){ seg.classList.add('flow'); }
+  }
+
+  function updateHints(id){
+    var section = document.getElementById('challenge-'+id);
+    var count = state.attempts[id];
+    var h1 = section.querySelector('.hint-1');
+    var h2 = section.querySelector('.hint-2');
+    if(count >= 2){ h1.classList.add('shown'); }
+    if(count >= 4){ h2.classList.add('shown'); }
+  }
+
+  function finishGame(){
+    clearInterval(state.timerInterval);
+    var elapsed = Date.now() - state.startTime;
+    document.getElementById('challenge-4').hidden = true;
+    finalSection.hidden = false;
+    document.getElementById('finalTime').textContent = formatTime(elapsed);
+    beep(523,150);
+    setTimeout(function(){ beep(659,150); }, 160);
+    setTimeout(function(){ beep(784,260); }, 320);
+  }
+
+  function advance(id){
+    openNode(id);
+    document.getElementById('challenge-'+id).hidden = true;
+    if(id < state.total){
+      var next = id+1;
+      document.getElementById('challenge-'+next).hidden = false;
+      var nextInput = document.getElementById('input-'+next);
+      if(nextInput){ nextInput.focus(); }
+    } else {
+      finishGame();
+    }
+  }
+
+  function handleSubmit(id, form){
+    return function(e){
+      e.preventDefault();
+      var input = document.getElementById('input-'+id);
+      var feedback = document.getElementById('feedback-'+id);
+      var attemptsNote = document.getElementById('attempts-'+id);
+      var expected = document.getElementById('challenge-'+id).getAttribute('data-code');
+      var given = normalize(input.value);
+
+      if(given.length === 0){
+        feedback.textContent = 'Escribe un código antes de ejecutar.';
+        feedback.className = 'feedback bad';
+        return;
+      }
+
+      if(given === expected){
+        feedback.textContent = '✔ Acceso concedido. Firewall desbloqueado.';
+        feedback.className = 'feedback ok';
+        beep(440 + id*70, 180);
+        setTimeout(function(){ advance(id); }, 550);
+      } else {
+        state.attempts[id]++;
+        feedback.textContent = '✖ Código incorrecto. Intento nº ' + state.attempts[id] + '.';
+        feedback.className = 'feedback bad';
+        attemptsNote.textContent = state.attempts[id] >= 2
+          ? 'Pista disponible más abajo.'
+          : (2 - state.attempts[id]) + ' intento(s) más para desbloquear una pista.';
+        updateHints(id);
+        form.classList.remove('shake');
+        void form.offsetWidth;
+        form.classList.add('shake');
+      }
+      input.value = '';
+      input.focus();
+    };
+  }
+
+  for(var i=1; i<=4; i++){
+    (function(id){
+      var form = document.querySelector('.answer-form[data-target="'+id+'"]');
+      form.addEventListener('submit', handleSubmit(id, form));
+    })(i);
+  }
+
+  startBtn.addEventListener('click', startGame);
+
+  restartBtn.addEventListener('click', function(){
+    clearInterval(state.timerInterval);
+    state.current = 1;
+    state.startTime = null;
+    state.attempts = {1:0,2:0,3:0,4:0};
+    document.querySelectorAll('.node').forEach(function(node){
+      node.classList.remove('open');
+      node.querySelector('.lock').textContent = '🔒';
+    });
+    document.querySelectorAll('.segment').forEach(function(seg){
+      seg.classList.remove('flow');
+    });
+    document.querySelectorAll('.challenge').forEach(function(sec){ sec.hidden = true; });
+    document.querySelectorAll('.hint').forEach(function(h){ h.classList.remove('shown'); });
+    document.querySelectorAll('.feedback').forEach(function(f){ f.textContent=''; f.className='feedback'; });
+    document.querySelectorAll('.attempts-note').forEach(function(a){ a.textContent=''; });
+    document.querySelectorAll('.answer-form input').forEach(function(inp){ inp.value=''; });
+    timerEl.textContent = '00:00';
+    document.getElementById('challenge-1').hidden = false;
+    finalSection.hidden = true;
+    introSection.hidden = false;
+  });
+
+})();
+</script>
+
+</body>
+</html>
